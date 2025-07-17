@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Face Analysis",
+    "slug": "face-analysis",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourcompany.faceanalysis",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs camera access to analyze your facial skin condition.",
+        "NSMicrophoneUsageDescription": "Microphone access is not used by this app."
+      },
+      "associatedDomains": [
+        "applinks:yourapp.com"
+      ]
+    },
+    "platforms": ["ios"],
+    "web": {
+      
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Face Analysis to access your camera to analyze skin condition."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "your-project-id-here"
+      }
+    }
+  }
+} 
