@@ -24,6 +24,11 @@ type UpgradeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList,
 
 interface UpgradeScreenProps {
   navigation: UpgradeScreenNavigationProp;
+  route?: {
+    params?: {
+      analysisData?: any; // For premium report upgrade flow
+    };
+  };
 }
 
 interface FeatureItemProps {
@@ -90,27 +95,37 @@ export default function UpgradeScreen({ navigation }: UpgradeScreenProps) {
   };
 
   const handlePurchase = async () => {
-    if (purchaseInProgress || !selectedProduct) return;
+    if (purchaseInProgress) return;
 
     setPurchaseInProgress(true);
     
     try {
+      // FOR TESTING: Use mock premium activation
+      await iap.activateMockPremium();
+      
+      Alert.alert(
+        '🎉 Premium Activated!',
+        'Welcome to Premium! You now have unlimited access to all features:\n\n✨ Advanced acne & wrinkle analysis\n🌅 Personalized routines\n📊 Progress tracking\n💎 Premium recommendations',
+        [
+          {
+            text: 'Start Analyzing',
+            onPress: () => navigation.navigate('Camera'),
+          },
+        ]
+      );
+      
+      /* PRODUCTION CODE:
+      if (!selectedProduct) return;
       const success = await iap.purchasePremium(selectedProduct);
       
       if (success) {
-        Alert.alert(
-          'Success!',
-          'Welcome to Premium! You now have unlimited access to all features.',
-          [
-            {
-              text: 'Start Analyzing',
-              onPress: () => navigation.navigate('Camera'),
-            },
-          ]
-        );
+        Alert.alert('Success!', 'Welcome to Premium!', [
+          { text: 'Start Analyzing', onPress: () => navigation.navigate('Camera') }
+        ]);
       } else {
-        Alert.alert('Purchase Failed', 'The purchase was not completed. Please try again.');
+        Alert.alert('Purchase Failed', 'Please try again.');
       }
+      */
     } catch (error) {
       console.error('Purchase failed:', error);
       Alert.alert('Error', 'An error occurred during purchase. Please try again.');
@@ -222,6 +237,19 @@ export default function UpgradeScreen({ navigation }: UpgradeScreenProps) {
           />
         </View>
 
+        {/* Test Mode Banner */}
+        <View style={styles.testModeSection}>
+          <View style={styles.testModeBanner}>
+            <Ionicons name="flask" size={24} color="#6366F1" />
+            <View style={styles.testModeContent}>
+              <Text style={styles.testModeTitle}>Test Mode</Text>
+              <Text style={styles.testModeText}>
+                Premium features activated for testing - all features unlocked!
+              </Text>
+            </View>
+          </View>
+        </View>
+
         {/* Pricing */}
         {products.length > 0 && (
           <View style={styles.pricingSection}>
@@ -271,9 +299,9 @@ export default function UpgradeScreen({ navigation }: UpgradeScreenProps) {
         {/* Action Buttons */}
         <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.purchaseButton, (purchaseInProgress || !selectedProduct) && styles.purchaseButtonDisabled]}
+            style={[styles.purchaseButton, purchaseInProgress && styles.purchaseButtonDisabled]}
             onPress={handlePurchase}
-            disabled={purchaseInProgress || !selectedProduct}
+            disabled={purchaseInProgress}
           >
             <LinearGradient
               colors={['#F59E0B', '#EAB308']}
@@ -285,7 +313,7 @@ export default function UpgradeScreen({ navigation }: UpgradeScreenProps) {
                 <>
                   <Ionicons name="star" size={20} color="#ffffff" />
                   <Text style={styles.purchaseButtonText}>
-                    Start Premium - {selectedProduct ? getProductTitle(selectedProduct) : 'Premium'}
+                    ✨ Activate Premium Features
                   </Text>
                 </>
               )}
@@ -505,5 +533,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#4F46E5',
     fontWeight: '600',
+  },
+  testModeSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  testModeBanner: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  testModeContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  testModeTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E40AF',
+    marginBottom: 4,
+  },
+  testModeText: {
+    fontSize: 14,
+    color: '#3730A3',
+    lineHeight: 18,
   },
 }); 

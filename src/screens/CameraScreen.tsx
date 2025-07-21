@@ -9,8 +9,9 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { Camera, CameraType } from 'expo-camera';
+import { Camera, CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useFaceAnalysis } from '@/hooks/useFaceAnalysis';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/types';
@@ -29,9 +30,11 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [showGuide, setShowGuide] = useState(true);
-  const cameraRef = useRef<Camera>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [pictureSize, setPictureSize] = useState<string | undefined>();
+  const cameraRef = useRef<CameraView>(null);
   
-  const { isAnalyzing, progress, currentStep, analyzeImage, checkLighting, error } = useFaceAnalysis();
+  const { isAnalyzing, progress, currentStep, analyzeImage, error } = useFaceAnalysis();
 
   useEffect(() => {
     (async () => {
@@ -47,44 +50,88 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
   }, [error]);
 
   const handleCapture = async () => {
-    if (!cameraRef.current || isCountingDown || isAnalyzing) return;
+    if (!cameraRef.current || isCountingDown) return;
 
     try {
       setIsCountingDown(true);
-      setShowGuide(false);
-
-      // Countdown
+      
+      // 3 second countdown
       for (let i = 3; i > 0; i--) {
         setCountdown(i);
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
+      
+      setCountdown(0);
 
       // Capture photo
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
+        quality: 0.5, // Quality can be higher now as resolution is controlled
         base64: false,
-        skipProcessing: false,
+        exif: false, // Disable EXIF data to prevent potential instability
       });
 
       setIsCountingDown(false);
 
-      // Check lighting conditions
-      const hasGoodLighting = await checkLighting(photo.uri);
-      if (!hasGoodLighting) {
+      await processImage(photo.uri);
+
+    } catch (err) {
+      console.error('Capture failed:', err);
+      setIsCountingDown(false);
+      setShowGuide(true);
+      Alert.alert('Camera Error', 'Failed to capture photo. Please try again.');
+    }
+  };
+
+  const handleImagePicker = async () => {
+    try {
+      // Request permission first
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission Required', 'Camera roll access is required to select photos.');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [3, 4], // Portrait aspect ratio
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await processImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Image picker failed:', error);
+      Alert.alert('Error', 'Failed to select image. Please try again.');
+    }
+  };
+
+  const processImage = async (imageUri: string) => {
+    try {
+      // Check if photo was captured successfully
+      if (!imageUri) {
+        Alert.alert('Error', 'Failed to get image. Please try again.');
         setShowGuide(true);
         return;
       }
 
-      // Detect face using ML Kit
-      const face = await getFirstFace(photo.uri);
+      console.log('Processing image:', imageUri);
+
+      // Check for face first
+      const face = await getFirstFace(imageUri);
       if (!face) {
-        Alert.alert('Face Not Detected', 'Please ensure your face is clearly visible in the frame and try again.');
+        Alert.alert('Face Not Detected', 'Please ensure your face is clearly visible and try again.');
         setShowGuide(true);
         return;
       }
+
+      console.log('Face detected:', face);
 
       // Analyze the captured image
-      const result = await analyzeImage(photo.uri);
+      const result = await analyzeImage(imageUri);
       
       if (result) {
         navigation.replace('Result', { analysisId: result.id });
@@ -92,10 +139,9 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
         setShowGuide(true);
       }
     } catch (err) {
-      console.error('Capture failed:', err);
-      Alert.alert('Error', 'Failed to capture photo. Please try again.');
-      setIsCountingDown(false);
+      console.error('Image processing failed:', err);
       setShowGuide(true);
+      Alert.alert('Processing Error', 'Failed to process image. Please try again.');
     }
   };
 
@@ -114,6 +160,35 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
     }
   };
 
+  const onCameraReady = async () => {
+    setCameraReady(true);
+    if (cameraRef.current) {
+      try {
+        const sizes = await cameraRef.current.getAvailablePictureSizesAsync();
+        // Simple logic to find a medium-low resolution
+        // e.g., aiming for something around 1280x720
+        let chosenSize = sizes.find(size => {
+          const [w, h] = size.split('x').map(Number);
+          return w === 1280 && h === 720;
+        });
+
+        // Fallback to the lowest available resolution if 1280x720 is not found
+        if (!chosenSize && sizes.length > 0) {
+          console.log('1280x720 not found, falling back to lowest resolution.');
+          chosenSize = sizes[sizes.length - 1]; 
+        }
+
+        if (chosenSize) {
+          console.log(`Setting picture size to: ${chosenSize}`);
+          setPictureSize(chosenSize);
+        }
+      } catch (e) {
+        console.error("Could not get available picture sizes", e);
+      }
+    }
+  };
+
+
   if (hasPermission === null) {
     return (
       <View style={styles.permissionContainer}>
@@ -126,7 +201,7 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
   if (hasPermission === false) {
     return (
       <View style={styles.permissionContainer}>
-        <Ionicons name="camera-off" size={64} color="#94a3b8" />
+        <Ionicons name={"camera-off" as any} size={64} color="#94a3b8" />
         <Text style={styles.permissionTitle}>Camera Access Required</Text>
         <Text style={styles.permissionText}>
           Please grant camera access to analyze your skin condition.
@@ -140,10 +215,18 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Camera style={styles.camera} type={CameraType.front} ref={cameraRef}>
+      <View style={styles.cameraWrapper}>
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="front"
+          ref={cameraRef}
+          onCameraReady={onCameraReady}
+          pictureSize={pictureSize}
+        />
+
         {/* Analysis Overlay */}
         {isAnalyzing && (
-          <View style={styles.analysisOverlay}>
+          <View style={styles.analysisOverlay} pointerEvents="none">
             <View style={styles.analysisContainer}>
               <ActivityIndicator size="large" color="#ffffff" style={styles.spinner} />
               <Text style={styles.analysisStep}>{currentStep}</Text>
@@ -157,28 +240,19 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
 
         {/* Face Guide */}
         {showGuide && !isAnalyzing && (
-          <View style={styles.guideContainer}>
+          <View style={styles.guideContainer} pointerEvents="none">
             <View style={styles.guideOverlay}>
               {/* Face oval guide */}
               <View style={styles.faceGuide}>
                 <View style={styles.faceOval} />
               </View>
-              
               {/* Instructions */}
               <View style={styles.instructionsContainer}>
                 <Text style={styles.instructionTitle}>Position Your Face</Text>
-                <Text style={styles.instructionText}>
-                  • Center your face in the oval
-                </Text>
-                <Text style={styles.instructionText}>
-                  • Ensure good lighting
-                </Text>
-                <Text style={styles.instructionText}>
-                  • Remove glasses if possible
-                </Text>
-                <Text style={styles.instructionText}>
-                  • Keep still during capture
-                </Text>
+                <Text style={styles.instructionText}>• Center your face in the oval</Text>
+                <Text style={styles.instructionText}>• Ensure good lighting</Text>
+                <Text style={styles.instructionText}>• Remove glasses if possible</Text>
+                <Text style={styles.instructionText}>• Keep still during capture</Text>
               </View>
             </View>
           </View>
@@ -186,11 +260,12 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
 
         {/* Countdown */}
         {isCountingDown && (
-          <View style={styles.countdownContainer}>
+          <View style={styles.countdownContainer} pointerEvents="none">
             <Text style={styles.countdownText}>{countdown}</Text>
             <Text style={styles.countdownSubtext}>Hold still...</Text>
           </View>
         )}
+      </View>
 
         {/* Controls */}
         <View style={styles.controls}>
@@ -201,17 +276,18 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
           <TouchableOpacity
             style={[
               styles.captureButton,
-              (isCountingDown || isAnalyzing) && styles.captureButtonDisabled,
+              (!cameraReady || isCountingDown || isAnalyzing) && styles.captureButtonDisabled,
             ]}
             onPress={handleCapture}
-            disabled={isCountingDown || isAnalyzing}
+            disabled={!cameraReady || isCountingDown || isAnalyzing}
           >
             <View style={styles.captureButtonInner} />
           </TouchableOpacity>
 
-          <View style={styles.placeholder} />
+          <TouchableOpacity style={styles.imagePickerButton} onPress={handleImagePicker}>
+            <Ionicons name="image" size={24} color="#ffffff" />
+          </TouchableOpacity>
         </View>
-      </Camera>
     </SafeAreaView>
   );
 }
@@ -220,6 +296,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  cameraWrapper: {
+    flex: 1,
   },
   camera: {
     flex: 1,
@@ -403,6 +482,14 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     backgroundColor: '#ffffff',
+  },
+  imagePickerButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   placeholder: {
     width: 50,

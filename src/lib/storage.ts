@@ -1,9 +1,9 @@
 import * as SecureStore from 'expo-secure-store';
-import { PremiumStatus, UsageLimit } from '@/types';
+import { PremiumStatus } from '@/types';
 
 const KEYS = {
   PREMIUM_STATUS: 'premium_status',
-  USAGE_LIMIT: 'usage_limit',
+  PREMIUM_ANALYSIS_COUNT: 'premium_analysis_count',
   ONBOARDING_COMPLETE: 'onboarding_complete',
 } as const;
 
@@ -30,87 +30,70 @@ class StorageService {
     return { isPremium: false };
   }
 
-  // Usage Limit Management
-  async setUsageLimit(limit: UsageLimit): Promise<void> {
+  // Premium Analysis Tracking (per-report billing)
+  async getPremiumAnalysisCount(): Promise<number> {
     try {
-      await SecureStore.setItemAsync(KEYS.USAGE_LIMIT, JSON.stringify(limit));
+      const data = await SecureStore.getItemAsync(KEYS.PREMIUM_ANALYSIS_COUNT);
+      return data ? parseInt(data, 10) : 0;
     } catch (error) {
-      console.error('Failed to save usage limit:', error);
+      console.error('Failed to get premium analysis count:', error);
+      return 0;
     }
   }
 
-  async getUsageLimit(): Promise<UsageLimit> {
+  async incrementPremiumAnalysis(): Promise<void> {
     try {
-      const data = await SecureStore.getItemAsync(KEYS.USAGE_LIMIT);
-      if (data) {
-        return JSON.parse(data);
-      }
+      const current = await this.getPremiumAnalysisCount();
+      await SecureStore.setItemAsync(KEYS.PREMIUM_ANALYSIS_COUNT, (current + 1).toString());
     } catch (error) {
-      console.error('Failed to get usage limit:', error);
+      console.error('Failed to increment premium analysis count:', error);
     }
-
-    return {
-      monthlyAnalysisCount: 0,
-      canAnalyze: true,
-    };
   }
 
-  async incrementAnalysisCount(): Promise<UsageLimit> {
-    const current = await this.getUsageLimit();
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    // Check if we're in a new month
-    let resetCount = false;
-    if (current.lastAnalysisDate) {
-      const lastAnalysis = new Date(current.lastAnalysisDate);
-      if (lastAnalysis.getMonth() !== currentMonth || lastAnalysis.getFullYear() !== currentYear) {
-        resetCount = true;
-      }
-    }
-
-    const newLimit: UsageLimit = {
-      lastAnalysisDate: now.getTime(),
-      monthlyAnalysisCount: resetCount ? 1 : current.monthlyAnalysisCount + 1,
-      canAnalyze: true, // Will be determined by the calling code based on premium status
-    };
-
-    await this.setUsageLimit(newLimit);
-    return newLimit;
-  }
-
+  // Basic analysis is always free and unlimited
   async checkCanAnalyze(): Promise<boolean> {
-    const premiumStatus = await this.getPremiumStatus();
-    
-    // Premium users can always analyze
-    if (premiumStatus.isPremium) {
-      return true;
-    }
-
-    // Free users: check monthly limit
-    const usageLimit = await this.getUsageLimit();
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    // If no previous analysis, they can analyze
-    if (!usageLimit.lastAnalysisDate) {
-      return true;
-    }
-
-    const lastAnalysis = new Date(usageLimit.lastAnalysisDate);
-    
-    // If it's a new month, they can analyze
-    if (lastAnalysis.getMonth() !== currentMonth || lastAnalysis.getFullYear() !== currentYear) {
-      return true;
-    }
-
-    // Free users get 1 analysis per month
-    return usageLimit.monthlyAnalysisCount < 1;
+    return true; // Basic analysis is always available
   }
 
-  // Onboarding Management
+  async incrementAnalysisCount(): Promise<void> {
+    // No-op: Basic analysis is unlimited
+    return;
+  }
+
+  // Season tracking for premium reports
+  async getCurrentSeason(): Promise<string> {
+    const month = new Date().getMonth();
+    if (month >= 2 && month <= 4) return 'spring';
+    if (month >= 5 && month <= 7) return 'summer';
+    if (month >= 8 && month <= 10) return 'fall';
+    return 'winter';
+  }
+
+  async getLastPremiumReportSeason(): Promise<string | null> {
+    try {
+      const data = await SecureStore.getItemAsync('last_premium_season');
+      return data;
+    } catch (error) {
+      console.error('Failed to get last premium season:', error);
+      return null;
+    }
+  }
+
+  async setLastPremiumReportSeason(season: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync('last_premium_season', season);
+    } catch (error) {
+      console.error('Failed to save last premium season:', error);
+    }
+  }
+
+  async shouldShowSeasonalRenewal(): Promise<boolean> {
+    const currentSeason = await this.getCurrentSeason();
+    const lastSeason = await this.getLastPremiumReportSeason();
+    return lastSeason !== null && lastSeason !== currentSeason;
+  }
+
+  // Onboarding
   async setOnboardingComplete(): Promise<void> {
     try {
       await SecureStore.setItemAsync(KEYS.ONBOARDING_COMPLETE, 'true');
@@ -129,15 +112,26 @@ class StorageService {
     }
   }
 
-  // Clear all data (for testing/reset)
-  async clearAll(): Promise<void> {
+  // Clear all data
+  async clearAllData(): Promise<void> {
     try {
-      await SecureStore.deleteItemAsync(KEYS.PREMIUM_STATUS);
-      await SecureStore.deleteItemAsync(KEYS.USAGE_LIMIT);
-      await SecureStore.deleteItemAsync(KEYS.ONBOARDING_COMPLETE);
+      await Promise.all([
+        SecureStore.deleteItemAsync(KEYS.PREMIUM_STATUS),
+        SecureStore.deleteItemAsync(KEYS.PREMIUM_ANALYSIS_COUNT),
+        SecureStore.deleteItemAsync(KEYS.ONBOARDING_COMPLETE),
+        SecureStore.deleteItemAsync('last_premium_season'),
+      ]);
     } catch (error) {
-      console.error('Failed to clear storage:', error);
+      console.error('Failed to clear data:', error);
     }
+  }
+
+  // Legacy support for existing code
+  async getUsageLimit(): Promise<{ monthlyAnalysisCount: number; canAnalyze: boolean }> {
+    return {
+      monthlyAnalysisCount: 0,
+      canAnalyze: true,
+    };
   }
 }
 

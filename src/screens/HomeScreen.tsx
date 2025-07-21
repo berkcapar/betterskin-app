@@ -89,21 +89,33 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     }
   };
 
-  const getRemainingAnalyses = () => {
-    if (premiumStatus.isPremium) return 'Unlimited';
-    
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    if (!usageLimit.lastAnalysisDate) return '1';
-    
-    const lastAnalysis = new Date(usageLimit.lastAnalysisDate);
-    if (lastAnalysis.getMonth() !== currentMonth || lastAnalysis.getFullYear() !== currentYear) {
-      return '1'; // New month
-    }
-    
-    return Math.max(0, 1 - usageLimit.monthlyAnalysisCount).toString();
+
+
+  // TEMPORARY: Reset function for testing
+  const handleResetStorage = async () => {
+    Alert.alert(
+      'Reset Storage',
+      'This will clear all your data including premium status and usage limits. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await storage.clearAllData();
+              await iap.deactivateMockPremium();
+              await database.clearAllData();
+              Alert.alert('Success', 'Storage has been reset. You can now analyze again.');
+              loadData(); // Reload data
+            } catch (error) {
+              console.error('Failed to reset storage:', error);
+              Alert.alert('Error', 'Failed to reset storage.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -142,14 +154,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           </TouchableOpacity>
         )}
 
-        {/* Analysis Status */}
-        <View style={styles.statusCard}>
-          <Text style={styles.statusTitle}>Monthly Analyses</Text>
-          <Text style={styles.statusValue}>{getRemainingAnalyses()}</Text>
-          <Text style={styles.statusSubtitle}>
-            {premiumStatus.isPremium ? 'remaining' : 'remaining this month'}
-          </Text>
-        </View>
+
 
         {/* Main Action Button */}
         <TouchableOpacity style={styles.analyzeButton} onPress={handleAnalyze}>
@@ -234,6 +239,15 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               <Text style={styles.quickActionText}>Upgrade</Text>
             </TouchableOpacity>
           )}
+
+          {/* TEMPORARY RESET BUTTON - Remove after testing */}
+          <TouchableOpacity
+            style={[styles.quickAction, { backgroundColor: '#FEE2E2', borderRadius: 8 }]}
+            onPress={handleResetStorage}
+          >
+            <Ionicons name="refresh-outline" size={24} color="#DC2626" />
+            <Text style={[styles.quickActionText, { color: '#DC2626' }]}>Reset</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>

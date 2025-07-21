@@ -38,6 +38,11 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [premiumStatus, setPremiumStatus] = useState<PremiumStatus>({ isPremium: false });
   const [isLoading, setIsLoading] = useState(true);
+  const [enhancedData, setEnhancedData] = useState<{
+    confidence?: number;
+    skinType?: string;
+    environmentalFactors?: any;
+  }>({});
 
   useEffect(() => {
     loadAnalysisResult();
@@ -81,13 +86,27 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
     return '#10B981'; // Green
   };
 
-  const getTextureColor = (texture: string) => {
-    switch (texture) {
-      case 'good': return '#10B981';
-      case 'medium': return '#F59E0B';
-      case 'poor': return '#EF4444';
-      default: return '#6B7280';
-    }
+  const getTextureColor = (score: number) => {
+    if (score >= 70) return '#EF4444'; // Red - rough texture
+    if (score >= 40) return '#F59E0B'; // Orange - moderate texture
+    return '#10B981'; // Green - smooth texture
+  };
+
+  const generateSkinOverview = (metrics: any, skinType?: string, confidence?: number) => {
+    const avgScore = (metrics.oiliness + metrics.redness + metrics.texture + (metrics.acne || 0) + (metrics.wrinkles || 0)) / 5;
+    
+    let condition = 'good';
+    if (avgScore > 60) condition = 'needs attention';
+    else if (avgScore > 40) condition = 'moderate';
+    else condition = 'excellent';
+    
+    const primaryConcern = metrics.oiliness > metrics.redness && metrics.oiliness > metrics.texture ? 'oiliness' :
+                          metrics.redness > metrics.texture ? 'redness' : 'texture';
+    
+    const confidenceText = confidence ? ` Analysis confidence: ${confidence}%` : '';
+    const skinTypeText = skinType ? ` Your ${skinType} skin` : ' Your skin';
+    
+    return `${skinTypeText} is in ${condition} condition. Primary focus area: ${primaryConcern}.${confidenceText}${!premiumStatus.isPremium ? ' Upgrade for detailed analysis including acne scoring and personalized routines.' : ''}`;
   };
 
   if (isLoading) {
@@ -127,6 +146,14 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
           </Text>
         </View>
 
+        {/* Skin Overview Section */}
+        <View style={styles.overviewSection}>
+          <Text style={styles.overviewTitle}>Analysis Overview</Text>
+          <Text style={styles.overviewText}>
+            {generateSkinOverview(analysis.metrics, analysis.skinType, analysis.confidence)}
+          </Text>
+        </View>
+
         {/* Metrics Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Skin Metrics</Text>
@@ -152,7 +179,7 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
           <MetricCard
             title="Texture"
             value={analysis.metrics.texture}
-            type="category"
+            type="percentage"
             color={getTextureColor(analysis.metrics.texture)}
             advice={analysis.advice.texture}
             icon="grid-outline"
@@ -163,26 +190,43 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
             <MetricCard
               title="Acne Score"
               value={analysis.metrics.acne}
-              type="category"
+              type="percentage"
               color={getTextureColor(analysis.metrics.acne)}
               advice={analysis.advice.acne || ''}
               icon="medical-outline"
               isPremium
             />
           ) : !premiumStatus.isPremium && (
-            <View style={styles.premiumMetricLocked}>
+            <TouchableOpacity 
+              style={styles.premiumMetricLocked}
+              onPress={handleUpgrade}
+            >
               <View style={styles.premiumMetricContent}>
-                <Ionicons name="lock-closed" size={24} color="#F59E0B" />
+                <Ionicons name="sparkles" size={24} color="#F59E0B" />
                 <View style={styles.premiumMetricText}>
-                  <Text style={styles.premiumMetricTitle}>Acne Score</Text>
-                  <Text style={styles.premiumMetricSubtitle}>Available in Premium</Text>
+                  <Text style={styles.premiumMetricTitle}>🧴 Advanced Analysis</Text>
+                  <Text style={styles.premiumMetricSubtitle}>Unlock acne scoring & wrinkle detection</Text>
                 </View>
               </View>
-              <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgrade}>
-                <Text style={styles.upgradeButtonText}>Upgrade</Text>
-              </TouchableOpacity>
-            </View>
+              <View style={styles.premiumCtaButton}>
+                <Text style={styles.premiumCtaText}>See More</Text>
+                <Ionicons name="arrow-forward" size={16} color="#F59E0B" />
+              </View>
+            </TouchableOpacity>
           )}
+
+          {/* Premium Wrinkles Metric */}
+          {premiumStatus.isPremium && analysis.metrics.wrinkles ? (
+            <MetricCard
+              title="Wrinkles"
+              value={analysis.metrics.wrinkles}
+              type="percentage"
+              color={getTextureColor(analysis.metrics.wrinkles)}
+              advice={analysis.advice.wrinkles || ''}
+              icon="time-outline"
+              isPremium
+            />
+          ) : null}
         </View>
 
         {/* Routines Section */}
@@ -208,16 +252,19 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
           <View style={styles.section}>
             <View style={styles.premiumRoutinesLocked}>
               <LinearGradient
-                colors={['#4F46E5', '#7C3AED']}
+                colors={['#6366F1', '#8B5CF6']}
                 style={styles.premiumGradient}
               >
-                <Ionicons name="star" size={32} color="#ffffff" />
-                <Text style={styles.premiumTitle}>Personalized Routines</Text>
+                <Ionicons name="sparkles" size={36} color="#ffffff" />
+                <Text style={styles.premiumTitle}>Unlock Your Perfect Routine</Text>
                 <Text style={styles.premiumSubtitle}>
-                  Get custom morning and evening skincare routines based on your analysis
+                  🌅 Personalized morning & evening routines{'\n'}
+                  🧴 Advanced acne & wrinkle analysis{'\n'}
+                  💎 Professional skincare recommendations{'\n'}
+                  📊 Detailed progress tracking
                 </Text>
                 <TouchableOpacity style={styles.premiumUpgradeButton} onPress={handleUpgrade}>
-                  <Text style={styles.premiumUpgradeButtonText}>Upgrade to Premium</Text>
+                  <Text style={styles.premiumUpgradeButtonText}>✨ Activate Premium</Text>
                 </TouchableOpacity>
               </LinearGradient>
             </View>
@@ -445,5 +492,59 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  premiumReportButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginLeft: 8,
+  },
+  premiumReportGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  premiumReportButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  overviewSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  overviewTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  overviewText: {
+    fontSize: 15,
+    color: '#374151',
+    lineHeight: 22,
+  },
+  premiumCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  premiumCtaText: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 4,
   },
 }); 

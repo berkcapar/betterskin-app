@@ -146,6 +146,12 @@ class IAPService {
   }
 
   async checkPremiumStatus(): Promise<PremiumStatus> {
+    // FOR TESTING: Check mock premium status first
+    const storedStatus = await storage.getPremiumStatus();
+    if (storedStatus.isPremium) {
+      return storedStatus;
+    }
+
     try {
       if (!this.isInitialized) {
         await this.initialize();
@@ -179,6 +185,28 @@ class IAPService {
       // Fallback to stored status if network request fails
       return await storage.getPremiumStatus();
     }
+  }
+
+  // FOR TESTING: Mock premium activation
+  async activateMockPremium(): Promise<void> {
+    const premiumStatus: PremiumStatus = {
+      isPremium: true,
+      purchaseDate: Date.now(),
+      expiryDate: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year from now
+      productId: 'mock_premium',
+    };
+    
+    await storage.setPremiumStatus(premiumStatus);
+    console.log('🎉 Mock premium activated!');
+  }
+
+  async deactivateMockPremium(): Promise<void> {
+    const premiumStatus: PremiumStatus = {
+      isPremium: false,
+    };
+    
+    await storage.setPremiumStatus(premiumStatus);
+    console.log('❌ Mock premium deactivated!');
   }
 
   private async updatePremiumStatus(): Promise<void> {

@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
-import { mediaPipe } from '@/lib/mediapipe';
-import { opencv } from '@/lib/opencv';
 import { database } from '@/lib/database';
 import { storage } from '@/lib/storage';
 import { iap } from '@/lib/iap';
+import { analyzeRealImage, analyzeRealImageEnhanced } from '@/lib/realPixelAnalysis';
+import { premiumAnalysis, PremiumAnalysisResult } from '@/lib/premiumAnalysis';
+import { openaiService } from '@/lib/openaiService';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { AnalysisResult, SkinMetrics, AdviceTexts, PersonalizedRoutines } from '@/types';
 
 interface AnalysisState {
@@ -26,7 +28,7 @@ export const useFaceAnalysis = () => {
     setState(prev => ({ ...prev, progress, currentStep: step }));
   }, []);
 
-  const analyzeImage = useCallback(async (imageUri: string): Promise<AnalysisResult | null> => {
+  const analyzeImageNew = useCallback(async (imageUri: string, isPremium: boolean = false): Promise<AnalysisResult | null> => {
     try {
       setState({
         isAnalyzing: true,
@@ -35,205 +37,198 @@ export const useFaceAnalysis = () => {
         error: null,
       });
 
-      // Check if user can analyze (free/premium limits)
+      // Basic analysis is always free and unlimited
       const canAnalyze = await storage.checkCanAnalyze();
       if (!canAnalyze) {
-        setState(prev => ({ ...prev, error: 'Monthly analysis limit reached. Upgrade to Premium for unlimited analyses.' }));
+        setState(prev => ({ ...prev, error: 'Analysis temporarily unavailable. Please try again.' }));
         return null;
       }
 
-      updateProgress(10, 'Initializing face detection...');
+      updateProgress(20, 'Processing image...');
       
-      // Initialize MediaPipe if needed
-      if (!mediaPipe.isReady()) {
-        await mediaPipe.initialize();
-      }
-      
-      updateProgress(25, 'Detecting face...');
-      
-      // Detect face and extract landmarks
-      const faceResult = await mediaPipe.detectFace(imageUri);
-      if (!faceResult) {
-        setState(prev => ({ ...prev, error: 'No face detected. Please ensure your face is clearly visible and well-lit.' }));
-        return null;
-      }
+      // Resize image for analysis
+      const resizedImage = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [{ resize: { width: 256, height: 256 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.PNG }
+      );
 
-      updateProgress(40, 'Analyzing skin regions...');
-      
-      // Extract face regions for analysis
-      const regions = mediaPipe.extractFaceRegions(faceResult.landmarks, 720, 720);
-      
-      updateProgress(60, 'Processing skin metrics...');
-      
-      // Initialize OpenCV and analyze skin
-      if (!opencv.isReady()) {
-        await opencv.initialize();
-      }
-      
-      const skinMetrics = await opencv.analyzeSkin(imageUri, regions);
-      
-      updateProgress(75, 'Generating analysis...');
-      
-      // Check premium status for additional features
+      updateProgress(40, 'Analyzing image colors...');
+
+      // Get previous analysis for temporal smoothing
+      const previousAnalyses = await database.getAnalysisHistory();
+      const previousResults = previousAnalyses.slice(0, 2).map(a => a.metrics);
+
+      // Use enhanced real image color analysis
+      const analysisResult = await analyzeRealImageEnhanced(
+        resizedImage.uri, 
+        undefined, // faceData - we can add this later
+        previousResults
+      );
+
+      // Check premium status first for appropriate progress message
       const premiumStatus = await iap.checkPremiumStatus();
-      
-      // Add acne analysis for premium users
-      if (premiumStatus.isPremium) {
-        skinMetrics.acne = generateAcneScore(); // TODO: Replace with actual ML model
-      }
-      
-      updateProgress(85, 'Creating personalized advice...');
-      
-      // Generate advice and routines
-      const advice = generateAdvice(skinMetrics);
-      const routines = premiumStatus.isPremium ? await generatePersonalizedRoutines(skinMetrics) : undefined;
-      
-      updateProgress(95, 'Saving results...');
-      
-      // Create analysis result
-      const analysisResult: AnalysisResult = {
-        id: `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      updateProgress(80, premiumStatus.isPremium ? 'Generating AI recommendations...' : 'Preparing recommendations...');
+
+      // Create base analysis result
+      const result: AnalysisResult = {
+        id: Date.now().toString(),
         timestamp: Date.now(),
         imageUri,
-        metrics: skinMetrics,
-        advice,
-        routines,
+        metrics: analysisResult.metrics,
+        advice: analysisResult.advice,
+        confidence: analysisResult.confidence,
+        skinType: analysisResult.skinType,
+        environmentalFactors: analysisResult.environmentalFactors,
       };
-      
+
+      // Add premium detailed report if requested
+      if (isPremium) {
+        updateProgress(85, 'Generating premium report...');
+        try {
+          const premiumReport = await premiumAnalysis.generatePremiumReport(
+            analysisResult.metrics,
+            analysisResult.skinType || 'medium',
+            analysisResult.confidence || 85
+          );
+          
+          // Add premium data to result
+          (result as any).premiumReport = premiumReport;
+          
+        } catch (error) {
+          console.error('Premium report generation failed:', error);
+          // Continue with basic result
+        }
+      } else {
+        // Add routines based on user status (already checked above)
+        result.routines = await generatePersonalizedRoutines(
+          analysisResult.metrics, 
+          analysisResult.skinType,
+          premiumStatus.isPremium
+        );
+      }
+
+      updateProgress(90, 'Saving results...');
+
       // Save to database
-      await database.saveAnalysis(analysisResult);
-      
-      // Update usage count
+      await database.saveAnalysis(result);
+
+      // Track usage (no limits for basic analysis)
       await storage.incrementAnalysisCount();
-      
-      updateProgress(100, 'Analysis complete!');
-      
+
+      updateProgress(100, 'Complete!');
+
       setState({
         isAnalyzing: false,
         progress: 100,
-        currentStep: 'Complete',
+        currentStep: 'Complete!',
         error: null,
       });
-      
-      return analysisResult;
-      
+
+      return result;
+
     } catch (error) {
       console.error('Analysis failed:', error);
-      setState({
+      setState(prev => ({
+        ...prev,
         isAnalyzing: false,
-        progress: 0,
-        currentStep: '',
         error: error instanceof Error ? error.message : 'Analysis failed. Please try again.',
-      });
+      }));
       return null;
     }
   }, [updateProgress]);
 
-  const checkLighting = useCallback(async (imageUri: string): Promise<boolean> => {
-    try {
-      const { isGood, brightness } = await opencv.checkLightingConditions(imageUri);
+  const generatePersonalizedRoutines = async (
+    metrics: SkinMetrics, 
+    skinType?: string,
+    isPremiumUser: boolean = false
+  ): Promise<PersonalizedRoutines> => {
+    
+    // FREE USERS: Fast template-based routines
+    if (!isPremiumUser) {
+      console.log('🆓 Generating basic routines for free user');
       
-      if (!isGood) {
-        const message = brightness < 100 
-          ? 'Lighting is too dark. Please move to a brighter area.'
-          : 'Lighting is too bright. Please avoid direct sunlight.';
-        
-        Alert.alert('Lighting Issue', message);
-        return false;
+      const morning = ['Gentle cleanser', 'Vitamin C serum', 'Moisturizer', 'SPF 30+'];
+      const evening = ['Gentle cleanser', 'Treatment serum', 'Night moisturizer'];
+
+      // Quick customization based on metrics
+      if (metrics.oiliness > 70) {
+        morning.splice(1, 0, 'Oil-control toner');
+        evening.splice(1, 0, 'Niacinamide serum');
       }
-      
-      return true;
-    } catch (error) {
-      console.error('Lighting check failed:', error);
-      return true; // Allow analysis to continue if check fails
+
+      if (metrics.redness > 60) {
+        morning.splice(1, 0, 'Soothing toner');
+        evening.splice(1, 0, 'Centella serum');
+      }
+
+      if (metrics.texture > 60) {
+        evening.splice(-1, 0, 'AHA/BHA treatment (2-3x/week)');
+      }
+
+      return { morning, evening };
     }
-  }, []);
+
+    // PREMIUM USERS: AI-enhanced routines
+    try {
+      console.log('💎 Generating AI-enhanced routines for premium user');
+      
+      const season = await storage.getCurrentSeason();
+      const aiRoutines = await openaiService.generateEnhancedRoutines(
+        metrics, 
+        skinType || 'medium', 
+        season
+      );
+
+      console.log('🤖 OpenAI routines generated successfully');
+
+      // Convert AI routines to our format
+      return {
+        morning: aiRoutines.morningRoutine.steps.map(step => 
+          `${step.product}: ${step.application}`
+        ),
+        evening: aiRoutines.eveningRoutine.steps.map(step => 
+          `${step.product}: ${step.application}`
+        ),
+        // Store full AI data for future use
+        enhanced: aiRoutines
+      };
+    } catch (error) {
+      console.error('❌ Failed to generate AI routines, using fallback:', error);
+      
+      // Fallback to basic routines even for premium
+      const morning = ['Gentle cleanser', 'Vitamin C serum', 'Moisturizer', 'SPF 30+'];
+      const evening = ['Gentle cleanser', 'Treatment serum', 'Night moisturizer'];
+
+      // Enhanced customization for premium fallback
+      if (metrics.oiliness > 70) {
+        morning.splice(1, 0, 'Oil-control toner');
+        evening.splice(1, 0, 'Niacinamide serum');
+      }
+
+      if (metrics.redness > 60) {
+        morning.splice(1, 0, 'Soothing toner');
+        evening.splice(1, 0, 'Centella serum');
+      }
+
+      if (metrics.texture > 60) {
+        evening.splice(-1, 0, 'AHA/BHA treatment (2-3x/week)');
+      }
+
+      if (metrics.acne && metrics.acne > 50) {
+        evening.splice(1, 0, 'Salicylic acid treatment');
+      }
+
+      if (metrics.wrinkles && metrics.wrinkles > 40) {
+        evening.splice(-1, 0, 'Retinol (start 1x/week)');
+      }
+
+      return { morning, evening };
+    }
+  };
 
   return {
     ...state,
-    analyzeImage,
-    checkLighting,
+    analyzeImage: analyzeImageNew,
   };
-};
-
-// Helper functions
-function generateAcneScore(): 'low' | 'medium' | 'high' {
-  // TODO: Replace with actual ML model (MobileNetV2 or similar)
-  const random = Math.random();
-  if (random < 0.5) return 'low';
-  if (random < 0.8) return 'medium';
-  return 'high';
-}
-
-function generateAdvice(metrics: SkinMetrics): AdviceTexts {
-  const advice: AdviceTexts = {
-    oiliness: getOilinessAdvice(metrics.oiliness),
-    redness: getRednessAdvice(metrics.redness),
-    texture: getTextureAdvice(metrics.texture),
-  };
-  
-  if (metrics.acne) {
-    advice.acne = getAcneAdvice(metrics.acne);
-  }
-  
-  return advice;
-}
-
-function getOilinessAdvice(score: number): string {
-  if (score >= 70) return 'High oil levels detected. Use oil-free cleansers and mattifying products.';
-  if (score >= 40) return 'Moderate oil levels. Balance with gentle cleansing and light moisturizer.';
-  return 'Low oil levels. Focus on hydration and gentle care.';
-}
-
-function getRednessAdvice(score: number): string {
-  if (score >= 60) return 'Significant redness detected. Consider anti-inflammatory ingredients like niacinamide.';
-  if (score >= 30) return 'Some redness present. Use gentle, fragrance-free products.';
-  return 'Minimal redness. Maintain your current gentle routine.';
-}
-
-function getTextureAdvice(texture: 'good' | 'medium' | 'poor'): string {
-  switch (texture) {
-    case 'good': return 'Great skin texture! Keep up your current routine.';
-    case 'medium': return 'Good texture with room for improvement. Consider gentle exfoliation.';
-    case 'poor': return 'Uneven texture detected. Focus on hydration and gentle exfoliation.';
-  }
-}
-
-function getAcneAdvice(acne: 'low' | 'medium' | 'high'): string {
-  switch (acne) {
-    case 'low': return 'Minimal acne detected. Maintain good hygiene and gentle cleansing.';
-    case 'medium': return 'Moderate acne present. Consider salicylic acid or benzoyl peroxide.';
-    case 'high': return 'Significant acne detected. Consider consulting a dermatologist.';
-  }
-}
-
-async function generatePersonalizedRoutines(metrics: SkinMetrics): Promise<PersonalizedRoutines> {
-  // TODO: Replace with OpenAI API call in production
-  // For MVP, use hard-coded intelligent routines based on metrics
-  
-  const baseRoutines = {
-    morning: ['Gentle Cleanser', 'Moisturizer', 'SPF 30+'],
-    evening: ['Cleanser', 'Treatment', 'Night Moisturizer'],
-  };
-  
-  // Customize based on metrics
-  if (metrics.oiliness > 60) {
-    baseRoutines.morning.splice(1, 0, 'Oil-Free Toner');
-    baseRoutines.evening[1] = 'Salicylic Acid Treatment';
-  }
-  
-  if (metrics.redness > 50) {
-    baseRoutines.morning.splice(1, 0, 'Niacinamide Serum');
-    baseRoutines.evening.splice(1, 0, 'Calming Serum');
-  }
-  
-  if (metrics.texture === 'poor') {
-    baseRoutines.evening[1] = 'Gentle Exfoliant (2-3x/week)';
-  }
-  
-  if (metrics.acne === 'high') {
-    baseRoutines.evening.splice(1, 0, 'Benzoyl Peroxide (spot treatment)');
-  }
-  
-  return baseRoutines;
-} 
+}; 

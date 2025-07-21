@@ -1,9 +1,10 @@
 // Analysis types
 export interface SkinMetrics {
-  oiliness: number; // 0-100
-  redness: number; // 0-100
-  texture: 'good' | 'medium' | 'poor';
-  acne?: 'low' | 'medium' | 'high'; // Premium only
+  oiliness: number; // 0-100 (higher = more oily)
+  redness: number; // 0-100 (higher = more red/irritated)
+  texture: number; // 0-100 (higher = rougher texture)
+  acne?: number; // 0-100 (higher = more acne) - Premium only
+  wrinkles?: number; // 0-100 (higher = more wrinkles) - Premium only
 }
 
 export interface AnalysisResult {
@@ -13,6 +14,13 @@ export interface AnalysisResult {
   metrics: SkinMetrics;
   advice: AdviceTexts;
   routines?: PersonalizedRoutines; // Premium only
+  confidence?: number; // Analysis confidence score
+  skinType?: string; // Detected skin type
+  environmentalFactors?: {
+    lightingQuality: number;
+    colorTemperature: number;
+    contrast: number;
+  };
 }
 
 export interface AdviceTexts {
@@ -20,11 +28,13 @@ export interface AdviceTexts {
   redness: string;
   texture: string;
   acne?: string;
+  wrinkles?: string; // New field for anti-aging advice
 }
 
 export interface PersonalizedRoutines {
   morning: string[];
   evening: string[];
+  enhanced?: any; // AI-generated enhanced routines
 }
 
 // Face detection types
@@ -69,6 +79,9 @@ export type RootStackParamList = {
   };
   History: undefined;
   Upgrade: undefined;
+  PremiumReport: {
+    analysisId: string;
+  };
 };
 
 // Camera types

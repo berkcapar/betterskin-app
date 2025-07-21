@@ -1,27 +1,6 @@
 import { FaceDetectionResult, FaceRegions } from '@/types';
 
-// Real ML Kit face detection
-import FaceDetection from 'react-native-face-detection';
-
-interface MLKitFace {
-  boundingBox: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  landmarks?: Array<{
-    type: string;
-    position: { x: number; y: number };
-  }>;
-  leftEyeOpenProbability?: number;
-  rightEyeOpenProbability?: number;
-  smilingProbability?: number;
-  headEulerAngleX?: number;
-  headEulerAngleY?: number;
-  headEulerAngleZ?: number;
-  trackingId?: number;
-}
+import { getFirstFace } from '@/lib/mlkit';
 
 class MediaPipeService {
   private isInitialized = false;
@@ -52,36 +31,24 @@ class MediaPipeService {
     try {
       console.log('Running face detection on:', imageUri);
       
-      // Face detection options for react-native-face-detection
-      const options = {
-        landmarkMode: 'ALL',     // 'NONE' or 'ALL'
-        contourMode: 'NONE',     // 'NONE' or 'ALL'
-        classificationMode: 'ALL', // 'NONE' or 'ALL'
-        performanceMode: 'FAST', // 'FAST' or 'ACCURATE'
-        minFaceSize: 0.1,        // Minimum face size (0.0 to 1.0)
-      };
-
-      // Detect faces using react-native-face-detection
-      const faces = await FaceDetection.processImage(imageUri, options);
-      
-      if (!faces || faces.length === 0) {
+      const face = await getFirstFace(imageUri) as any;
+      if (!face) {
         console.log('No faces detected');
         return null;
       }
 
-      const face = faces[0]; // Use first detected face
       console.log('Face detected:', face);
 
       // Convert face detection result to our format
-      const landmarks = this.convertMLKitLandmarks(face.landmarks || []);
+      const landmarks = this.convertMLKitLandmarks((face.landmarks || []) as any[]);
       
       return {
         landmarks,
         boundingBox: {
-          x: face.boundingBox.x,
-          y: face.boundingBox.y,
-          width: face.boundingBox.width,
-          height: face.boundingBox.height,
+          x: face.bounds?.origin?.x || 0,
+          y: face.bounds?.origin?.y || 0,
+          width: face.bounds?.size?.width || 0,
+          height: face.bounds?.size?.height || 0,
         },
         confidence: this.calculateConfidence(face),
       };
@@ -97,13 +64,13 @@ class MediaPipeService {
     return null;
   }
 
-  private calculateConfidence(face: MLKitFace): number {
+  private calculateConfidence(face: any): number {
     // Calculate confidence based on available ML Kit data
     let confidence = 0.85; // Base confidence for ML Kit detection
     
     // If eyes are detected and open, increase confidence
-    if (face.leftEyeOpenProbability !== undefined && face.rightEyeOpenProbability !== undefined) {
-      const eyeOpenness = (face.leftEyeOpenProbability + face.rightEyeOpenProbability) / 2;
+    if (face.leftEyeOpenProbability != null && face.rightEyeOpenProbability != null) {
+      const eyeOpenness = ((face.leftEyeOpenProbability ?? 0) + (face.rightEyeOpenProbability ?? 0)) / 2;
       confidence += eyeOpenness * 0.1;
     }
     
@@ -113,8 +80,8 @@ class MediaPipeService {
     }
     
     // If head pose is reasonable, increase confidence
-    if (face.headEulerAngleY !== undefined && face.headEulerAngleZ !== undefined) {
-      const headPoseScore = 1 - Math.abs(face.headEulerAngleY) / 90 - Math.abs(face.headEulerAngleZ) / 90;
+    if (face.rollAngle != null && face.yawAngle != null) {
+      const headPoseScore = 1 - Math.abs(face.yawAngle ?? 0) / 90 - Math.abs(face.rollAngle ?? 0) / 90;
       confidence += headPoseScore * 0.05;
     }
     
@@ -133,7 +100,7 @@ class MediaPipeService {
       'LEFT_MOUTH': [61, 84, 17, 314, 405, 320, 307, 375, 321, 308, 324, 318],
       'RIGHT_MOUTH': [291, 303, 267, 269, 270, 267, 271, 272],
       'LEFT_CHEEK': [116, 117, 118, 119, 120, 121, 126, 142, 36, 205, 206, 207, 213, 192, 147, 187, 177, 137, 227, 234],
-      'RIGHT_CHEEK': [345, 346, 347, 348, 349, 350, 451, 452, 453, 464, 435, 410, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93],
+      'RIGHT_CHEEK': [345, 346, 347, 348, 349, 350, 451, 452, 453, 464, 435, 410, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 142, 36, 205, 206],
       'LEFT_EAR': [127, 142, 36, 205, 206],
       'RIGHT_EAR': [356, 454, 323, 361, 288],
     };

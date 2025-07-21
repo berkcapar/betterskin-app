@@ -15,6 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 // Services
 import { database } from '@/lib/database';
+import { storage } from '@/lib/storage';
 
 // Types
 import { RootStackParamList, AnalysisResult } from '@/types';
@@ -28,9 +29,10 @@ interface HistoryScreenProps {
 interface HistoryItemProps {
   analysis: AnalysisResult;
   onPress: () => void;
+  onDelete: (id: string) => void;
 }
 
-const HistoryItem: React.FC<HistoryItemProps> = ({ analysis, onPress }) => {
+const HistoryItem: React.FC<HistoryItemProps> = ({ analysis, onPress, onDelete }) => {
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -60,20 +62,44 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ analysis, onPress }) => {
     return '#10B981';
   };
 
-  const getTextureColor = (texture: string) => {
-    switch (texture) {
-      case 'good': return '#10B981';
-      case 'medium': return '#F59E0B';
-      case 'poor': return '#EF4444';
-      default: return '#6B7280';
-    }
+  const getTextureColor = (score: number) => {
+    if (score >= 70) return '#EF4444'; // Red - rough texture
+    if (score >= 40) return '#F59E0B'; // Orange - moderate texture
+    return '#10B981'; // Green - smooth texture
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Analysis',
+      'Are you sure you want to delete this analysis? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => onDelete(analysis.id),
+        },
+      ]
+    );
   };
 
   return (
     <TouchableOpacity style={styles.historyItem} onPress={onPress}>
       <View style={styles.historyHeader}>
         <Text style={styles.historyDate}>{formatDate(analysis.timestamp)}</Text>
-        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={handleDelete}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+          </TouchableOpacity>
+          <Ionicons name="chevron-forward" size={20} color="#94a3b8" style={styles.chevron} />
+        </View>
       </View>
       
       <View style={styles.metricsGrid}>
@@ -86,7 +112,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ analysis, onPress }) => {
                 { backgroundColor: getScoreColor(analysis.metrics.oiliness) },
               ]}
             />
-            <Text style={styles.metricValue}>{analysis.metrics.oiliness}%</Text>
+                            <Text style={styles.metricValue}>{analysis.metrics.oiliness}%</Text>
           </View>
         </View>
 
@@ -99,7 +125,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ analysis, onPress }) => {
                 { backgroundColor: getScoreColor(analysis.metrics.redness) },
               ]}
             />
-            <Text style={styles.metricValue}>{analysis.metrics.redness}%</Text>
+                            <Text style={styles.metricValue}>{analysis.metrics.redness}%</Text>
           </View>
         </View>
 
@@ -113,7 +139,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ analysis, onPress }) => {
               ]}
             />
             <Text style={styles.metricValue}>
-              {analysis.metrics.texture.charAt(0).toUpperCase() + analysis.metrics.texture.slice(1)}
+              {analysis.metrics.texture}%
             </Text>
           </View>
         </View>
@@ -129,7 +155,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ analysis, onPress }) => {
                 ]}
               />
               <Text style={styles.metricValue}>
-                {analysis.metrics.acne.charAt(0).toUpperCase() + analysis.metrics.acne.slice(1)}
+                {analysis.metrics.acne}%
               </Text>
               <View style={styles.premiumBadge}>
                 <Ionicons name="star" size={10} color="#F59E0B" />
@@ -179,6 +205,18 @@ export default function HistoryScreen({ navigation }: HistoryScreenProps) {
     navigation.navigate('Camera');
   };
 
+  const handleDeleteAnalysis = async (id: string) => {
+    try {
+      await database.deleteAnalysis(id);
+      // Note: decrementAnalysisCount removed since basic analysis is now unlimited
+      setAnalyses(analyses.filter(analysis => analysis.id !== id));
+      Alert.alert('Analysis Deleted', 'Your analysis has been deleted and monthly count updated.');
+    } catch (error) {
+      console.error('Failed to delete analysis:', error);
+      Alert.alert('Error', 'Failed to delete analysis.');
+    }
+  };
+
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="analytics-outline" size={80} color="#94a3b8" />
@@ -211,6 +249,7 @@ export default function HistoryScreen({ navigation }: HistoryScreenProps) {
           <HistoryItem
             analysis={item}
             onPress={() => handleItemPress(item)}
+            onDelete={handleDeleteAnalysis}
           />
         )}
         contentContainerStyle={[
@@ -278,6 +317,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    marginRight: 10,
+  },
+  chevron: {
+    marginLeft: 10,
   },
   metricsGrid: {
     flexDirection: 'row',

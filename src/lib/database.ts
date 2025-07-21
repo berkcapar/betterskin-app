@@ -19,6 +19,7 @@ class DatabaseService {
   private async createTables(): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
+    // First create the table with basic structure
     const createTableQuery = `
       CREATE TABLE IF NOT EXISTS analyses (
         id TEXT PRIMARY KEY,
@@ -26,14 +27,39 @@ class DatabaseService {
         imageUri TEXT NOT NULL,
         oiliness INTEGER NOT NULL,
         redness INTEGER NOT NULL,
-        texture TEXT NOT NULL,
-        acne TEXT,
+        texture INTEGER NOT NULL,
+        acne INTEGER,
         advice TEXT NOT NULL,
         routines TEXT
       );
     `;
 
     await this.db.execAsync(createTableQuery);
+
+    // Add new columns if they don't exist
+    try {
+      await this.db.execAsync('ALTER TABLE analyses ADD COLUMN wrinkles INTEGER');
+    } catch (e) {
+      // Column already exists
+    }
+
+    try {
+      await this.db.execAsync('ALTER TABLE analyses ADD COLUMN confidence INTEGER');
+    } catch (e) {
+      // Column already exists
+    }
+
+    try {
+      await this.db.execAsync('ALTER TABLE analyses ADD COLUMN skinType TEXT');
+    } catch (e) {
+      // Column already exists
+    }
+
+    try {
+      await this.db.execAsync('ALTER TABLE analyses ADD COLUMN environmentalFactors TEXT');
+    } catch (e) {
+      // Column already exists
+    }
   }
 
   async saveAnalysis(result: AnalysisResult): Promise<void> {
@@ -41,8 +67,8 @@ class DatabaseService {
 
     const query = `
       INSERT OR REPLACE INTO analyses 
-      (id, timestamp, imageUri, oiliness, redness, texture, acne, advice, routines)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, timestamp, imageUri, oiliness, redness, texture, acne, wrinkles, advice, routines, confidence, skinType, environmentalFactors)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
@@ -53,8 +79,12 @@ class DatabaseService {
       result.metrics.redness,
       result.metrics.texture,
       result.metrics.acne || null,
+      result.metrics.wrinkles || null,
       JSON.stringify(result.advice),
       result.routines ? JSON.stringify(result.routines) : null,
+      result.confidence || null,
+      result.skinType || null,
+      result.environmentalFactors ? JSON.stringify(result.environmentalFactors) : null,
     ];
 
     await this.db!.runAsync(query, values);
@@ -72,7 +102,7 @@ class DatabaseService {
       LIMIT 3
     `;
 
-    const rows = await this.db!.getAllAsync(query) as DatabaseAnalysis[];
+    const rows = await this.db!.getAllAsync(query) as any[];
     
     return rows.map(this.mapDatabaseToResult);
   }
@@ -81,9 +111,16 @@ class DatabaseService {
     if (!this.db) await this.init();
 
     const query = 'SELECT * FROM analyses WHERE id = ? LIMIT 1';
-    const row = await this.db!.getFirstAsync(query, [id]) as DatabaseAnalysis | null;
+    const row = await this.db!.getFirstAsync(query, [id]) as any | null;
     
     return row ? this.mapDatabaseToResult(row) : null;
+  }
+
+  async deleteAnalysis(id: string): Promise<void> {
+    if (!this.db) await this.init();
+
+    const query = 'DELETE FROM analyses WHERE id = ?';
+    await this.db!.runAsync(query, [id]);
   }
 
   private async cleanupOldAnalyses(): Promise<void> {
@@ -101,7 +138,7 @@ class DatabaseService {
     await this.db.runAsync(deleteQuery);
   }
 
-  private mapDatabaseToResult(row: DatabaseAnalysis): AnalysisResult {
+  private mapDatabaseToResult(row: any): AnalysisResult {
     return {
       id: row.id,
       timestamp: row.timestamp,
@@ -109,11 +146,15 @@ class DatabaseService {
       metrics: {
         oiliness: row.oiliness,
         redness: row.redness,
-        texture: row.texture as 'good' | 'medium' | 'poor',
-        acne: row.acne as 'low' | 'medium' | 'high' | undefined,
+        texture: row.texture,
+        acne: row.acne || undefined,
+        wrinkles: row.wrinkles || undefined,
       },
       advice: JSON.parse(row.advice),
       routines: row.routines ? JSON.parse(row.routines) : undefined,
+      confidence: row.confidence || undefined,
+      skinType: row.skinType || undefined,
+      environmentalFactors: row.environmentalFactors ? JSON.parse(row.environmentalFactors) : undefined,
     };
   }
 

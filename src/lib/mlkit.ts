@@ -1,36 +1,28 @@
-import { RNMLKitFaceDetector, RNMLKitFace, RNMLKitFaceDetectorOptions, RNMLKitFaceDetectionResult } from '@infinitered/react-native-mlkit-face-detection';
+import * as FaceDetector from 'expo-face-detector';
 
-let detector: RNMLKitFaceDetector | null = null;
-
-async function getDetector(options: RNMLKitFaceDetectorOptions = { performanceMode: 'fast' }): Promise<RNMLKitFaceDetector> {
-  if (!detector) {
-    detector = new RNMLKitFaceDetector(options, true);
-    await detector.initialize(options);
-  }
-  return detector;
-}
-
-export async function getFirstFace(uri: string): Promise<RNMLKitFace | null> {
+export async function getFirstFace(imageUri: string) {
   try {
-    const det = await getDetector({ performanceMode: 'fast', landmarkMode: true, classificationMode: true });
-    const res: RNMLKitFaceDetectionResult | undefined = await det.detectFaces(uri);
-    if (res?.success && res.faces.length > 0) {
-      return res.faces[0];
+    console.log('Starting face detection on:', imageUri);
+    
+    const options = {
+      mode: FaceDetector.FaceDetectorMode.fast,
+      detectLandmarks: FaceDetector.FaceDetectorLandmarks.none,
+      runClassifications: FaceDetector.FaceDetectorClassifications.none,
+    };
+
+    const result = await FaceDetector.detectFacesAsync(imageUri, options);
+    console.log('Face detection result:', result);
+    
+    // expo-face-detector returns an object with faces array
+    if (!result || !result.faces || !Array.isArray(result.faces) || result.faces.length === 0) {
+      console.log('No faces detected');
+      return null;
     }
-    return null;
-  } catch (error) {
-    console.error('MLKit detectFaces error:', error);
-    return null;
-  }
-}
 
-export async function detectFacesInImage(uri: string): Promise<RNMLKitFace[]> {
-  try {
-    const det = await getDetector({ performanceMode: 'fast', landmarkMode: true, classificationMode: true });
-    const res: RNMLKitFaceDetectionResult | undefined = await det.detectFaces(uri);
-    return res?.success ? res.faces : [];
+    console.log('Face detected:', result.faces[0]);
+    return result.faces[0];
   } catch (error) {
-    console.error('MLKit detectFaces error:', error);
-    return [];
+    console.error('Face detection error:', error);
+    return null;
   }
 } 
