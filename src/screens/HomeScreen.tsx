@@ -130,7 +130,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         {premiumStatus.isPremium ? (
           <View style={styles.premiumBanner}>
             <LinearGradient
-              colors={['#F59E0B', '#EAB308']}
+              colors={['#08B5BF', '#06A3AC']}
               style={styles.premiumGradient}
             >
               <Ionicons name="star" size={24} color="#ffffff" />
@@ -149,7 +149,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                   Unlimited analyses + Acne scoring + Personalized routines
                 </Text>
               </View>
-              <Ionicons name="arrow-forward-circle" size={32} color="#4F46E5" />
+              <Ionicons name="arrow-forward-circle" size={32} color="#08B5BF" />
             </View>
           </TouchableOpacity>
         )}
@@ -159,13 +159,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         {/* Main Action Button */}
         <TouchableOpacity style={styles.analyzeButton} onPress={handleAnalyze}>
           <LinearGradient
-            colors={['#4F46E5', '#3B82F6']}
+            colors={['#08B5BF', '#06A3AC']}
             style={styles.analyzeGradient}
           >
             <Ionicons name="camera" size={32} color="#ffffff" />
             <Text style={styles.analyzeButtonText}>Start Analysis</Text>
             <Text style={styles.analyzeButtonSubtext}>
-              Analyze your skin condition
+              Get personalized skincare routine
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -294,6 +294,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingRight: 8, // Reduce right padding to prevent overflow
   },
   upgradeTitle: {
     fontSize: 16,
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
   },
   sectionLink: {
     fontSize: 16,
-    color: '#4F46E5',
+    color: '#08B5BF',
     fontWeight: '600',
   },
   emptyState: {

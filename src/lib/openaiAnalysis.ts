@@ -182,11 +182,57 @@ Focus on supportive skincare health recommendations.`;
  * Converts OpenAI result to our app's SkinMetrics format
  */
 export function convertToSkinMetrics(openaiResult: OpenAIAnalysisResult): SkinMetrics {
+  // Convert string values to numeric scores (0-100)
+  const convertOiliness = (level: string): number => {
+    switch (level) {
+      case 'low': return 20;
+      case 'medium': return 50;
+      case 'high': return 80;
+      default: return 50;
+    }
+  };
+
+  const convertRedness = (level: string): number => {
+    switch (level) {
+      case 'low': return 20;
+      case 'medium': return 50;
+      case 'high': return 80;
+      default: return 30;
+    }
+  };
+
+  const convertTexture = (level: string): number => {
+    switch (level) {
+      case 'good': return 20;
+      case 'medium': return 50;
+      case 'poor': return 80;
+      default: return 40;
+    }
+  };
+
+  const convertAcne = (level: string): number => {
+    switch (level) {
+      case 'low': return 15;
+      case 'medium': return 45;
+      case 'high': return 75;
+      default: return 25;
+    }
+  };
+
+  const convertWrinkles = (level: string): number => {
+    switch (level) {
+      case 'minimal': return 15;
+      case 'moderate': return 45;
+      case 'significant': return 75;
+      default: return 25;
+    }
+  };
+
   return {
-    oiliness: openaiResult.oiliness,
-    redness: openaiResult.redness,
-    texture: openaiResult.texture,
-    acne: openaiResult.acne,
-    wrinkles: openaiResult.wrinkles, // New field we'll add to SkinMetrics
+    oiliness: convertOiliness(openaiResult.oiliness),
+    redness: convertRedness(openaiResult.redness),
+    texture: convertTexture(openaiResult.texture),
+    acne: convertAcne(openaiResult.acne),
+    wrinkles: convertWrinkles(openaiResult.wrinkles),
   };
 } 

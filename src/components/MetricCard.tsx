@@ -116,6 +116,18 @@ export default function MetricCard({
         </View>
       )}
 
+      {/* Info Box */}
+      <View style={styles.infoBox}>
+        <Ionicons name="information-circle-outline" size={16} color="#6b7280" />
+        <Text style={styles.infoText}>
+          {title === 'Oiliness' && "Measures skin's oil production and shine levels. Higher scores indicate oilier skin."}
+          {title === 'Redness' && 'Detects skin inflammation and irritation. Higher scores suggest more sensitive skin.'}
+          {title === 'Texture' && 'Analyzes skin smoothness and evenness. Higher scores indicate rougher texture.'}
+          {title === 'Acne' && 'Identifies blemishes and breakouts. Higher scores suggest more acne-prone skin.'}
+          {title === 'Wrinkles' && 'Detects fine lines and aging signs. Higher scores indicate more visible aging.'}
+        </Text>
+      </View>
+
       {/* Advice */}
       <View style={styles.adviceContainer}>
         <Text style={styles.adviceText}>{advice}</Text>
@@ -233,6 +245,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#64748b',
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  infoText: {
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 18,
+    marginLeft: 8,
+    flex: 1,
   },
   adviceContainer: {
     backgroundColor: '#f8fafc',

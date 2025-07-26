@@ -92,7 +92,7 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
     return '#10B981'; // Green - smooth texture
   };
 
-  const generateSkinOverview = (metrics: any, skinType?: string, confidence?: number) => {
+  const generateSkinOverview = (metrics: any, skinType?: string) => {
     const avgScore = (metrics.oiliness + metrics.redness + metrics.texture + (metrics.acne || 0) + (metrics.wrinkles || 0)) / 5;
     
     let condition = 'good';
@@ -100,13 +100,9 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
     else if (avgScore > 40) condition = 'moderate';
     else condition = 'excellent';
     
-    const primaryConcern = metrics.oiliness > metrics.redness && metrics.oiliness > metrics.texture ? 'oiliness' :
-                          metrics.redness > metrics.texture ? 'redness' : 'texture';
+    const skinTypeText = skinType ? `Your ${skinType} skin` : 'Your skin';
     
-    const confidenceText = confidence ? ` Analysis confidence: ${confidence}%` : '';
-    const skinTypeText = skinType ? ` Your ${skinType} skin` : ' Your skin';
-    
-    return `${skinTypeText} is in ${condition} condition. Primary focus area: ${primaryConcern}.${confidenceText}${!premiumStatus.isPremium ? ' Upgrade for detailed analysis including acne scoring and personalized routines.' : ''}`;
+    return `${skinTypeText} is in ${condition} condition. Focus on gentle skincare and daily protection.`;
   };
 
   if (isLoading) {
@@ -148,11 +144,12 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
 
         {/* Skin Overview Section */}
         <View style={styles.overviewSection}>
-          <Text style={styles.overviewTitle}>Analysis Overview</Text>
           <Text style={styles.overviewText}>
-            {generateSkinOverview(analysis.metrics, analysis.skinType, analysis.confidence)}
+            {generateSkinOverview(analysis.metrics, analysis.skinType)}
           </Text>
         </View>
+
+
 
         {/* Metrics Section */}
         <View style={styles.section}>
@@ -185,38 +182,20 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
             icon="grid-outline"
           />
 
-          {/* Premium Acne Metric */}
-          {premiumStatus.isPremium && analysis.metrics.acne ? (
+          {/* Acne Metric - Now Free */}
+          {analysis.metrics.acne && (
             <MetricCard
-              title="Acne Score"
+              title="Acne"
               value={analysis.metrics.acne}
               type="percentage"
               color={getTextureColor(analysis.metrics.acne)}
               advice={analysis.advice.acne || ''}
               icon="medical-outline"
-              isPremium
             />
-          ) : !premiumStatus.isPremium && (
-            <TouchableOpacity 
-              style={styles.premiumMetricLocked}
-              onPress={handleUpgrade}
-            >
-              <View style={styles.premiumMetricContent}>
-                <Ionicons name="sparkles" size={24} color="#F59E0B" />
-                <View style={styles.premiumMetricText}>
-                  <Text style={styles.premiumMetricTitle}>🧴 Advanced Analysis</Text>
-                  <Text style={styles.premiumMetricSubtitle}>Unlock acne scoring & wrinkle detection</Text>
-                </View>
-              </View>
-              <View style={styles.premiumCtaButton}>
-                <Text style={styles.premiumCtaText}>See More</Text>
-                <Ionicons name="arrow-forward" size={16} color="#F59E0B" />
-              </View>
-            </TouchableOpacity>
           )}
 
-          {/* Premium Wrinkles Metric */}
-          {premiumStatus.isPremium && analysis.metrics.wrinkles ? (
+          {/* Wrinkles Metric - Now Free */}
+          {analysis.metrics.wrinkles && (
             <MetricCard
               title="Wrinkles"
               value={analysis.metrics.wrinkles}
@@ -224,9 +203,8 @@ export default function ResultScreen({ route, navigation }: ResultScreenProps) {
               color={getTextureColor(analysis.metrics.wrinkles)}
               advice={analysis.advice.wrinkles || ''}
               icon="time-outline"
-              isPremium
             />
-          ) : null}
+          )}
         </View>
 
         {/* Routines Section */}

@@ -109,8 +109,16 @@ export default function App() {
             name="Home"
             component={HomeScreen}
             options={{
-              title: 'Face Analysis',
-              headerLargeTitle: true,
+              title: 'BetterSkin',
+              headerLargeTitle: false,
+              headerStyle: {
+                backgroundColor: '#f8fafc',
+              },
+              headerTitleStyle: {
+                fontWeight: '700',
+                fontSize: 20,
+                color: '#08B5BF',
+              },
             }}
           />
           
@@ -120,6 +128,13 @@ export default function App() {
             options={{
               title: 'Take Photo',
               headerBackTitle: 'Cancel',
+              headerStyle: {
+                backgroundColor: '#f8fafc',
+              },
+              headerTitleStyle: {
+                fontWeight: '600',
+                color: '#08B5BF',
+              },
             }}
           />
           
@@ -129,6 +144,13 @@ export default function App() {
             options={{
               title: 'Analysis Results',
               headerBackTitle: 'Home',
+              headerStyle: {
+                backgroundColor: '#f8fafc',
+              },
+              headerTitleStyle: {
+                fontWeight: '600',
+                color: '#08B5BF',
+              },
             }}
           />
           
@@ -138,6 +160,13 @@ export default function App() {
             options={{
               title: 'Analysis History',
               headerBackTitle: 'Home',
+              headerStyle: {
+                backgroundColor: '#f8fafc',
+              },
+              headerTitleStyle: {
+                fontWeight: '600',
+                color: '#08B5BF',
+              },
             }}
           />
           
@@ -147,6 +176,13 @@ export default function App() {
             options={{
               title: 'Upgrade to Premium',
               headerBackTitle: 'Back',
+              headerStyle: {
+                backgroundColor: '#f8fafc',
+              },
+              headerTitleStyle: {
+                fontWeight: '600',
+                color: '#08B5BF',
+              },
             }}
           />
         </Stack.Navigator>
