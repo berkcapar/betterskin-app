@@ -67,6 +67,7 @@ export interface UsageLimit {
   lastAnalysisDate?: number;
   monthlyAnalysisCount: number;
   canAnalyze: boolean;
+  nextResetDate?: string;
 }
 
 // Navigation types

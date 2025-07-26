@@ -5,15 +5,16 @@ A React Native + Expo iOS skincare analysis app that uses advanced RGB color ana
 ## 🎯 Features
 
 ### Free Plan
-- **1 analysis per month** - Basic skin assessment
+- **1 analysis per month** - Basic skin assessment with monthly reset
 - **3 Core Metrics**: Oiliness (0-100), Redness (0-100), Texture (0-100)
 - **Instant Advice** - Personalized tips for each metric
 - **Local Storage** - Keep last 3 analysis results
 - **Complete Privacy** - All data stays on your device
 - **Face Detection** - Real-time face detection with ML Kit
+- **Monthly Reset** - Analysis limit resets on the 1st of each month
 
 ### Premium Plan
-- **Unlimited Analyses** - No monthly restrictions
+- **Unlimited Analyses** - No monthly restrictions or limits
 - **Advanced RGB Analysis** - Enhanced color-based skin assessment
 - **5 Comprehensive Metrics**: Oiliness, Redness, Texture, Acne Detection, Wrinkle Analysis
 - **AI-Powered Routines** - OpenAI GPT-4 generated personalized routines
@@ -341,6 +342,7 @@ expo r -c
 - **Advanced Metrics**: Added acne detection and wrinkle analysis
 - **AI Routine Generation**: OpenAI GPT-4 powered personalized routines
 - **Seasonal Analysis**: Context-aware seasonal skincare adjustments
+- **Monthly Analysis Limits**: Free users get 1 analysis per month with automatic reset
 
 ### Technical Improvements
 - **TypeScript Migration**: Complete type safety implementation

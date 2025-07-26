@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Dimensions,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +23,7 @@ const ONBOARDING_STEPS = [
     title: 'Welcome to Face Analysis',
     subtitle: 'Discover your skin\'s condition in seconds',
     description: 'Get personalized insights about your skin\'s oiliness, redness, and texture using advanced AI analysis.',
-    icon: 'face-outline' as const,
+    icon: 'analytics-outline' as const,
     color: '#4F46E5',
   },
   {
@@ -85,9 +86,21 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
 
         {/* Content */}
         <View style={styles.content}>
-          <View style={[styles.iconContainer, { backgroundColor: `${step.color}15` }]}>
-            <Ionicons name={step.icon} size={80} color={step.color} />
-          </View>
+          {currentStep === 0 ? (
+            // First step: Show face analysis grid image
+            <View style={[styles.iconContainer, { backgroundColor: '#f8fafc' }]}>
+              <Image
+                source={require('../../assets/face-analysis-grid.png')}
+                style={styles.faceAnalysisImage}
+                resizeMode="cover"
+              />
+            </View>
+          ) : (
+            // Other steps: Show icon
+            <View style={[styles.iconContainer, { backgroundColor: `${step.color}15` }]}>
+              <Ionicons name={step.icon} size={80} color={step.color} />
+            </View>
+          )}
 
           <Text style={[styles.title, { color: step.color }]}>{step.title}</Text>
           <Text style={styles.subtitle}>{step.subtitle}</Text>
@@ -156,6 +169,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 40,
+  },
+  faceAnalysisImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
   },
   title: {
     fontSize: 28,

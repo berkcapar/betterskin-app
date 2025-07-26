@@ -5,6 +5,8 @@ const KEYS = {
   PREMIUM_STATUS: 'premium_status',
   PREMIUM_ANALYSIS_COUNT: 'premium_analysis_count',
   ONBOARDING_COMPLETE: 'onboarding_complete',
+  FREE_ANALYSIS_COUNT: 'free_analysis_count',
+  FREE_ANALYSIS_MONTH: 'free_analysis_month',
 } as const;
 
 class StorageService {
@@ -30,6 +32,56 @@ class StorageService {
     return { isPremium: false };
   }
 
+  // Free Analysis Tracking (monthly limit)
+  async getFreeAnalysisCount(): Promise<number> {
+    try {
+      const data = await SecureStore.getItemAsync(KEYS.FREE_ANALYSIS_COUNT);
+      return data ? parseInt(data, 10) : 0;
+    } catch (error) {
+      console.error('Failed to get free analysis count:', error);
+      return 0;
+    }
+  }
+
+  async getFreeAnalysisMonth(): Promise<string> {
+    try {
+      const data = await SecureStore.getItemAsync(KEYS.FREE_ANALYSIS_MONTH);
+      return data || '';
+    } catch (error) {
+      console.error('Failed to get free analysis month:', error);
+      return '';
+    }
+  }
+
+  async incrementFreeAnalysis(): Promise<void> {
+    try {
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+      const storedMonth = await this.getFreeAnalysisMonth();
+      
+      // If it's a new month, reset the count
+      if (storedMonth !== currentMonth) {
+        await SecureStore.setItemAsync(KEYS.FREE_ANALYSIS_COUNT, '1');
+        await SecureStore.setItemAsync(KEYS.FREE_ANALYSIS_MONTH, currentMonth);
+      } else {
+        // Same month, increment count
+        const current = await this.getFreeAnalysisCount();
+        await SecureStore.setItemAsync(KEYS.FREE_ANALYSIS_COUNT, (current + 1).toString());
+      }
+    } catch (error) {
+      console.error('Failed to increment free analysis count:', error);
+    }
+  }
+
+  async resetFreeAnalysisCount(): Promise<void> {
+    try {
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      await SecureStore.setItemAsync(KEYS.FREE_ANALYSIS_COUNT, '0');
+      await SecureStore.setItemAsync(KEYS.FREE_ANALYSIS_MONTH, currentMonth);
+    } catch (error) {
+      console.error('Failed to reset free analysis count:', error);
+    }
+  }
+
   // Premium Analysis Tracking (per-report billing)
   async getPremiumAnalysisCount(): Promise<number> {
     try {
@@ -50,14 +102,87 @@ class StorageService {
     }
   }
 
-  // Basic analysis is always free and unlimited
+  // Analysis permission check
   async checkCanAnalyze(): Promise<boolean> {
-    return true; // Basic analysis is always available
+    try {
+      const premiumStatus = await this.getPremiumStatus();
+      
+      // Premium users have unlimited analyses
+      if (premiumStatus.isPremium) {
+        return true;
+      }
+      
+      // Free users have 1 analysis per month
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const storedMonth = await this.getFreeAnalysisMonth();
+      const analysisCount = await this.getFreeAnalysisCount();
+      
+      // If it's a new month, reset and allow
+      if (storedMonth !== currentMonth) {
+        await this.resetFreeAnalysisCount();
+        return true;
+      }
+      
+      // Same month, check if under limit
+      return analysisCount < 1;
+    } catch (error) {
+      console.error('Failed to check analysis permission:', error);
+      return false;
+    }
   }
 
   async incrementAnalysisCount(): Promise<void> {
-    // No-op: Basic analysis is unlimited
-    return;
+    try {
+      const premiumStatus = await this.getPremiumStatus();
+      
+      if (premiumStatus.isPremium) {
+        // Premium users don't have monthly limits
+        return;
+      } else {
+        // Free users increment monthly count
+        await this.incrementFreeAnalysis();
+      }
+    } catch (error) {
+      console.error('Failed to increment analysis count:', error);
+    }
+  }
+
+  // Get usage information for UI
+  async getUsageLimit(): Promise<{ monthlyAnalysisCount: number; canAnalyze: boolean; nextResetDate?: string }> {
+    try {
+      const premiumStatus = await this.getPremiumStatus();
+      
+      if (premiumStatus.isPremium) {
+        return {
+          monthlyAnalysisCount: 0,
+          canAnalyze: true,
+        };
+      }
+      
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const storedMonth = await this.getFreeAnalysisMonth();
+      const analysisCount = await this.getFreeAnalysisCount();
+      
+      // Calculate next reset date
+      let nextResetDate: string | undefined;
+      if (storedMonth === currentMonth) {
+        const currentDate = new Date();
+        const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+        nextResetDate = nextMonth.toISOString().slice(0, 10); // YYYY-MM-DD format
+      }
+      
+      return {
+        monthlyAnalysisCount: analysisCount,
+        canAnalyze: analysisCount < 1,
+        nextResetDate,
+      };
+    } catch (error) {
+      console.error('Failed to get usage limit:', error);
+      return {
+        monthlyAnalysisCount: 0,
+        canAnalyze: false,
+      };
+    }
   }
 
   // Season tracking for premium reports
@@ -118,20 +243,14 @@ class StorageService {
       await Promise.all([
         SecureStore.deleteItemAsync(KEYS.PREMIUM_STATUS),
         SecureStore.deleteItemAsync(KEYS.PREMIUM_ANALYSIS_COUNT),
+        SecureStore.deleteItemAsync(KEYS.FREE_ANALYSIS_COUNT),
+        SecureStore.deleteItemAsync(KEYS.FREE_ANALYSIS_MONTH),
         SecureStore.deleteItemAsync(KEYS.ONBOARDING_COMPLETE),
         SecureStore.deleteItemAsync('last_premium_season'),
       ]);
     } catch (error) {
       console.error('Failed to clear data:', error);
     }
-  }
-
-  // Legacy support for existing code
-  async getUsageLimit(): Promise<{ monthlyAnalysisCount: number; canAnalyze: boolean }> {
-    return {
-      monthlyAnalysisCount: 0,
-      canAnalyze: true,
-    };
   }
 }
 

@@ -6,26 +6,23 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-      "splash": {
-    "image": "./assets/splash.png",
-    "resizeMode": "cover",
-    "backgroundColor": "#08B5BF"
-  },
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#08B5BF"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
           "ios": {
         "supportsTablet": false,
-        "bundleIdentifier": "com.example.betterskin",
+        "bundleIdentifier": "com.berkcapar.betterskin",
         "buildNumber": "1",
 
         "infoPlist": {
           "NSCameraUsageDescription": "This app needs camera access to analyze your facial skin condition.",
         "NSMicrophoneUsageDescription": "Microphone access is not used by this app."
-      },
-      "associatedDomains": [
-        "applinks:yourapp.com"
-      ]
+      }
     },
     "platforms": [
       "ios"

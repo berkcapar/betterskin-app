@@ -156,16 +156,48 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
 
 
+        {/* Analysis Status */}
+        {!premiumStatus.isPremium && (
+          <View style={styles.analysisStatus}>
+            <View style={styles.statusContent}>
+              <Ionicons name="analytics-outline" size={20} color="#6B7280" />
+              <Text style={styles.statusText}>
+                {usageLimit.monthlyAnalysisCount === 0 
+                  ? '1 free analysis remaining this month'
+                  : 'Monthly analysis limit reached'
+                }
+              </Text>
+            </View>
+            {usageLimit.nextResetDate && (
+              <Text style={styles.resetDate}>
+                Resets on {new Date(usageLimit.nextResetDate).toLocaleDateString()}
+              </Text>
+            )}
+          </View>
+        )}
+
         {/* Main Action Button */}
-        <TouchableOpacity style={styles.analyzeButton} onPress={handleAnalyze}>
+        <TouchableOpacity 
+          style={[
+            styles.analyzeButton, 
+            !usageLimit.canAnalyze && styles.analyzeButtonDisabled
+          ]} 
+          onPress={handleAnalyze}
+          disabled={!usageLimit.canAnalyze}
+        >
           <LinearGradient
-            colors={['#08B5BF', '#06A3AC']}
+            colors={usageLimit.canAnalyze ? ['#08B5BF', '#06A3AC'] : ['#9CA3AF', '#6B7280']}
             style={styles.analyzeGradient}
           >
             <Ionicons name="camera" size={32} color="#ffffff" />
-            <Text style={styles.analyzeButtonText}>Start Analysis</Text>
+            <Text style={styles.analyzeButtonText}>
+              {usageLimit.canAnalyze ? 'Start Analysis' : 'Analysis Limit Reached'}
+            </Text>
             <Text style={styles.analyzeButtonSubtext}>
-              Get personalized skincare routine
+              {usageLimit.canAnalyze 
+                ? 'Get personalized skincare routine'
+                : 'Upgrade to Premium for unlimited analyses'
+              }
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -337,6 +369,33 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     borderRadius: 20,
     overflow: 'hidden',
+  },
+  analyzeButtonDisabled: {
+    opacity: 0.6,
+  },
+  analysisStatus: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statusContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  statusText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 8,
+    flex: 1,
+  },
+  resetDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginLeft: 28,
   },
   analyzeGradient: {
     padding: 32,
