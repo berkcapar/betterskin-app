@@ -28,7 +28,6 @@ A React Native + Expo iOS skincare analysis app that uses advanced RGB color ana
 - **TypeScript** for type safety
 - **RGB Color Analysis** - Advanced pixel-based skin analysis
 - **ML Kit Face Detection** (expo-face-detector) for face detection
-- **TensorFlow.js** with BlazeFace for enhanced face detection
 - **OpenAI GPT-4** for AI-powered routine generation (text only)
 - **SQLite** (expo-sqlite) for local data storage
 - **RevenueCat** (react-native-purchases) for premium subscriptions
@@ -343,6 +342,7 @@ expo r -c
 - **AI Routine Generation**: OpenAI GPT-4 powered personalized routines
 - **Seasonal Analysis**: Context-aware seasonal skincare adjustments
 - **Monthly Analysis Limits**: Free users get 1 analysis per month with automatic reset
+- **Optimized Bundle**: Removed unused TensorFlow.js dependencies for smaller app size
 
 ### Technical Improvements
 - **TypeScript Migration**: Complete type safety implementation
